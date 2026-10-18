@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProofPay Demo</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#15181d; --mut:#5d6672; --line:#dfe3e8; --acc:#3b5bdb; --ok:#1e8e4e; --bad:#c92a2a; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#101215; --card:#181b20; --ink:#eceff3; --mut:#9aa4b0; --line:#2a2f37; --acc:#7c96ff; --ok:#4cc27f; --bad:#ff7b7b; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { padding:20px 16px 8px; max-width:1200px; margin:0 auto; }
+  h1 { margin:0; font-size:22px; } .sub { color:var(--mut); margin:4px 0 0; }
+  main { max-width:1200px; margin:0 auto; padding:8px 16px 40px; display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:14px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  section.wide { grid-column:1/-1; }
+  h2 { margin:0 0 4px; font-size:16px; } .role { color:var(--mut); font-size:13px; margin:0 0 10px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:8px 0 3px; }
+  input, select { width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font:inherit; }
+  button { margin-top:8px; padding:7px 12px; border:0; border-radius:6px; background:var(--acc); color:#fff; font:inherit; cursor:pointer; }
+  button.alt { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; } .row > * { flex:1; min-width:110px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; } td, th { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .mono { font-family:var(--mono); font-size:12px; word-break:break-all; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:99px; font-size:12px; border:1px solid var(--line); }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  #log { font-family:var(--mono); font-size:12px; white-space:pre-wrap; max-height:260px; overflow:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px; }
+  .note { color:var(--mut); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ProofPay <span class="tag">local demo, no real funds</span></h1>
+  <p class="sub">Pay an invoice from a shielded pool, then prove it was paid without revealing who paid. All four roles run on your machine.</p>
+</header>
+<main>
+  <section id="merchant">
+    <h2>1. Merchant</h2><p class="role">Creates invoices. Each payment lands on a fresh one-time (stealth) address.</p>
+    <div class="row"><div><label>Amount (ETH)</label><input id="invAmt" value="0.25"></div><div><label>Memo</label><input id="invMemo" value="Coffee order #42"></div></div>
+    <button id="mkInv">Create invoice</button>
+    <button class="alt" id="scan">Scan for payments</button>
+    <button class="alt" id="sweep">Sweep to main wallet</button>
+    <div id="invoices"></div>
+    <div id="merchantBal" class="note"></div>
+  </section>
+
+  <section id="payer">
+    <h2>2. Payer</h2><p class="role">Deposits into the pool, then pays invoices with a zero-knowledge proof.</p>
+    <div class="row"><div><label>Deposit (ETH)</label><input id="depAmt" value="1"></div></div>
+    <button id="deposit">Deposit into pool</button>
+    <div id="notes"></div>
+    <label>Invoice</label><select id="payInv"></select>
+    <label>Note to spend</label><select id="payNote"></select>
+    <label>Submit via</label>
+    <select id="payMode"><option value="relayer">Relayer (hides my wallet, 0.01 ETH fee)</option><option value="direct">My own wallet (no fee, I am visible)</option></select>
+    <button id="pay">Prove and pay</button>
+    <div id="payerBal" class="note"></div>
+  </section>
+
+  <section id="verifier">
+    <h2>3. Third-party verifier</h2><p class="role">E.g. a delivery service. Accepts a receipt once; learns nothing about the payer.</p>
+    <label>Payment to prove</label><select id="rcpPay"></select>
+    <button id="mkReceipt">Generate receipt proof</button>
+    <button class="alt" id="verify">Submit to verifier</button>
+    <button class="alt" id="replay">Submit again (replay)</button>
+    <div id="receiptInfo" class="note"></div>
+  </section>
+
+  <section id="auditor">
+    <h2>4. Compliance</h2><p class="role">Deposit screening and per-payment disclosure to an auditor.</p>
+    <div class="row"><button id="block">Block payer's address</button><button class="alt" id="unblock">Unblock</button></div>
+    <label>Payment to disclose</label><select id="disPay"></select>
+    <button id="disclose">Disclose to auditor</button>
+    <div id="disResult" class="note"></div>
+  </section>
+
+  <section class="wide">
+    <h2>What a public blockchain observer sees</h2>
+    <p class="role">Note the payment's sender is the relayer (or you, if you pay directly), the recipient is a one-time address, and nothing links a deposit to a payment.</p>
+    <table id="observer"><thead><tr><th>Block</th><th>Event</th><th>Sent by</th><th>ETH</th><th>Detail</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="wide"><h2>Log</h2><div id="log"></div></section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let lastReceipt = null, state = null;
+const short = (a) => a ? a.slice(0, 8) + "…" + a.slice(-6) : "";
+function log(msg, cls) { const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = new Date().toLocaleTimeString() + "  " + msg; $("log").prepend(d); }
+async function api(path, body) {
+  const r = await fetch("/api/" + path, body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return { status: r.status, json: await r.json() };
+}
+async function run(btn, fn) {
+  btn.disabled = true;
+  try { await fn(); } catch (e) { log("ERROR " + e.message, "bad"); }
+  btn.disabled = false; await refresh();
+}
+function fill(sel, items) { const prev = sel.value; sel.innerHTML = items.map(([v, t]) => `<option value="${v}">${t}</option>`).join(""); if ([...sel.options].some(o => o.value === prev)) sel.value = prev; }
+
+async function refresh() {
+  state = (await api("state")).json;
+  $("invoices").innerHTML = state.invoices.length ? `<table><tr><th>Invoice</th><th>ETH</th><th>Status</th></tr>${state.invoices.map(i => `<tr><td>${i.memo || "(no memo)"}<br><span class="mono">${i.id.slice(0, 12)}…</span></td><td>${i.amountEth}</td><td>${i.paid ? '<span class="ok">paid</span>' : "unpaid"}</td></tr>`).join("")}</table>` : "";
+  $("merchantBal").textContent = `Main wallet ${state.merchantEth} ETH. One-time addresses found: ${state.stealthAddresses.length}` + state.stealthAddresses.map(s => ` [${short(s.address)}: ${s.eth}]`).join("");
+  $("notes").innerHTML = state.notes.length ? `<table><tr><th>Note</th><th>ETH</th><th></th></tr>${state.notes.map(n => `<tr><td>#${n.i}</td><td>${n.eth}</td><td>${n.spent ? "spent" : "unspent"}</td></tr>`).join("")}</table>` : "";
+  $("payerBal").textContent = `Wallet ${short(state.payerAddress)}: ${state.payerEth} ETH. Pool holds ${state.poolBalance} ETH (everyone's, mixed).`;
+  fill($("payInv"), state.invoices.filter(i => !i.paid).map(i => [i.id, `${i.memo || i.id.slice(0, 8)} (${i.amountEth} ETH)`]));
+  fill($("payNote"), state.notes.filter(n => !n.spent).map(n => [n.i, `#${n.i} (${n.eth} ETH)`]));
+  const pays = state.payments.map(p => [p.i, `payment ${p.i}: ${p.eth} ETH via ${p.via}`]);
+  fill($("rcpPay"), pays); fill($("disPay"), pays);
+  const obs = (await api("observer")).json;
+  $("observer").querySelector("tbody").innerHTML = obs.map(o => `<tr><td>${o.block}</td><td>${o.kind}</td><td class="mono">${short(o.from)}</td><td>${o.amountEth}</td><td class="mono">${o.detail}</td></tr>`).join("");
+}
+
+$("mkInv").onclick = (e) => run(e.target, async () => { const r = await api("invoice", { amountEth: $("invAmt").value, memo: $("invMemo").value }); log(r.json.ok ? "Invoice created " + r.json.invoice.id.slice(0, 12) + "…" : "ERROR " + r.json.error, r.json.ok ? "" : "bad"); });
+$("scan").onclick = (e) => run(e.target, async () => { const r = await api("merchant/scan", {}); log(`Merchant scanned announcements: ${r.json.found} payment(s) detected with the viewing key`); });
+$("sweep").onclick = (e) => run(e.target, async () => { const r = await api("merchant/sweep", {}); log(`Swept ${r.json.swept} ETH from one-time addresses to the main wallet`); });
+$("deposit").onclick = (e) => run(e.target, async () => { const r = await api("deposit", { eth: $("depAmt").value }); log(r.json.ok ? `Deposited; note #${r.json.note} at leaf ${r.json.index}` : "ERROR " + r.json.error, r.json.ok ? "" : "bad"); });
+$("pay").onclick = (e) => run(e.target, async () => {
+  log("Generating zero-knowledge proof (takes a few seconds)…");
+  const r = await api("pay", { invoiceId: $("payInv").value, noteIndex: Number($("payNote").value), mode: $("payMode").value });
+  if (!r.json.ok) return log("ERROR " + r.json.error, "bad");
+  log(`Paid via ${r.json.via}. Proof ${r.json.proveMs} ms, gas ${r.json.gasUsed}. On-chain sender: ${short(r.json.txFrom)}${r.json.via === "relayer" ? " (the relayer, not the payer)" : " (the payer)"}`, "ok");
+});
+$("mkReceipt").onclick = (e) => run(e.target, async () => {
+  const r = await api("receipt", { paymentIndex: Number($("rcpPay").value) });
+  if (!r.json.ok) return log("ERROR " + r.json.error, "bad");
+  lastReceipt = r.json.receipt; $("receiptInfo").textContent = `Receipt generated in ${r.json.proveMs} ms. Public data only: invoice, merchant, minimum amount, verifier id, receipt nullifier.`;
+  log("Receipt proof generated", "ok");
+});
+async function submit() {
+  if (!lastReceipt) return log("Generate a receipt first", "bad");
+  const r = await api("verify", lastReceipt);
+  log(r.json.ok ? `Verifier ACCEPTED receipt (invoice ${r.json.invoiceId.slice(0, 10)}…, min ${r.json.minAmount} wei). It never learned who paid.` : `Verifier REJECTED: ${r.json.error}`, r.json.ok ? "ok" : "bad");
+}
+$("verify").onclick = (e) => run(e.target, submit);
+$("replay").onclick = (e) => run(e.target, submit);
+$("block").onclick = (e) => run(e.target, async () => { await api("policy", { block: true }); log("Payer address blocklisted: new deposits from it will revert (existing notes are untouched)"); });
+$("unblock").onclick = (e) => run(e.target, async () => { await api("policy", { block: false }); log("Payer address unblocked"); });
+$("disclose").onclick = (e) => run(e.target, async () => {
+  const d = await api("disclosure", { paymentIndex: Number($("disPay").value) });
+  if (!d.json.ok) return log("ERROR " + d.json.error, "bad");
+  const a = await api("audit", d.json.disclosure);
+  $("disResult").textContent = a.json.ok ? `Auditor verified this one payment on-chain (tx ${short(a.json.txHash)}). Nothing else about the payer is revealed.` : "Auditor rejected: " + a.json.reason;
+  log($("disResult").textContent, a.json.ok ? "ok" : "bad");
+});
+refresh();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest   # free for public repositories
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run fetch:circom
+      - run: npm run setup
+      - run: npm run compile
+      - run: npm test
+      - name: End-to-end demo smoke test
+        run: |
+          node scripts/demo.js > demo.log 2>&1 &
+          for i in $(seq 1 60); do grep -q "demo is running" demo.log && break; sleep 2; done
+          node scripts/smoke.js
+      - run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true

@@ -1,0 +1,13 @@
+node_modules/
+artifacts/
+cache/
+typechain-types/
+coverage/
+*.db
+.env
+# Circuit build output. zkeys/wasm are reproducible from `npm run setup`;
+# for releases, publish them with their SHA-256 hashes instead of committing.
+build/
+tools/circom/circom.exe
+tools/circom/circom
+contracts/generated/

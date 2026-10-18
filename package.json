@@ -1,0 +1,40 @@
+{
+  "name": "proofpay",
+  "version": "0.1.0",
+  "description": "Privacy-preserving cryptocurrency payment verification (ZK invoice-bound receipts)",
+  "main": "index.js",
+  "scripts": {
+    "fetch:circom": "node scripts/fetch-circom.js",
+    "setup": "node scripts/setup.js",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.js",
+    "verifier": "node services/verifier-api/server.js",
+    "demo": "node scripts/demo.js",
+    "demo:smoke": "node scripts/smoke.js",
+    "node": "hardhat node",
+    "bench": "hardhat run scripts/bench.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.29.1"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^11.2.1",
+    "@noble/curves": "^1.4.2",
+    "@openzeppelin/contracts": "^5.6.1",
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "ethers": "^6.17.0",
+    "fastify": "^5.12.7",
+    "snarkjs": "^0.7.6"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.5"
+  }
+}

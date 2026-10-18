@@ -1,0 +1,33 @@
+{
+  "runs": 5,
+  "pay_prove_ms": {
+    "mean": 1617.8746399999998,
+    "min": 927.0778,
+    "max": 4274.864
+  },
+  "receipt_prove_ms": {
+    "mean": 853.5793799999999,
+    "min": 812.4252,
+    "max": 901.786
+  },
+  "receipt_verify_ms": {
+    "mean": 28.72078,
+    "min": 23.3234,
+    "max": 34.1122
+  },
+  "pay_gas": {
+    "mean": 1075198.6,
+    "min": 1070132,
+    "max": 1080234
+  },
+  "deposit_gas": {
+    "mean": 842015,
+    "min": 836970,
+    "max": 847060
+  },
+  "pay_proof_json_bytes": 647,
+  "receipt_proof_json_bytes": 721,
+  "node": "v22.16.0",
+  "platform": "win32/x64",
+  "cpus": 16
+}
